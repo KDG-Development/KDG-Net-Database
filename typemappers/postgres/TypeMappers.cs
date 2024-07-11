@@ -1,7 +1,7 @@
 using NodaTime;
 using System.Data;
 
-namespace KDG.Database.PostgreSQL.TypeMappers
+namespace KDG.Database.TypeMappers.PostgreSQL
 {
   public class NodaTimeInstant : Dapper.SqlMapper.TypeHandler<NodaTime.Instant>
   {

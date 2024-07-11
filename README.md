@@ -1,4 +1,9 @@
 # Getting started
+
+## PostgreSQL
+
+### Connecting to the database
+
 1. Initialize your database connection
 ```
 var db = new KDG.Database.Database.PostgreSQL("your-connection-string");
@@ -9,6 +14,54 @@ var data = db.withConnection(async conn => {
   var result = await conn.QueryAsync("select * from table");
   return result;
 });
+```
+
+### DML Operations
+
+The `KDG.Database.Database.PostgreSQL` class has corresponding insert, update, and delete methods
+- Insert
+```
+
+  KDG.Database.Database.PostgreSQL.Insert<T>(
+    Npgsql.NpgsqlTransaction t,
+    KDG.Database.DML.InsertConfig<T> data
+  )
+```
+- Update
+```
+
+  KDG.Database.Database.PostgreSQL.Update<T>(
+    Npgsql.NpgsqlTransaction t,
+    KDG.Database.DML.UpdateConfig<T> data
+  )
+```
+- Delete
+```
+
+  KDG.Database.Database.PostgreSQL.Delete<T>(
+    Npgsql.NpgsqlTransaction t,
+    KDG.Database.DML.DeleteConfig<T> data
+  )
+```
+
+Here's what a full example might look like:
+
+```
+var db = new KDG.Database.PostgreSQL("connection-string");
+await db.withTransaction(t => {
+  db.Insert(
+    t,
+    new KDG.Database.DML.InsertConfig<UserModel>{
+      Table="your-table",
+      Data=New UserModel(),
+      Fields=new Dictionary<string,Func<UserModel,object>>{
+        "id", x => x.id,
+        "email", x => x.email
+      },
+    }
+  );
+  return true;
+})
 ```
 
 ## Support
