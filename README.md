@@ -35,6 +35,14 @@ The `KDG.Database.Database.PostgreSQL` class has corresponding insert, update, a
     KDG.Database.DML.UpdateConfig<T> data
   )
 ```
+- Upsert
+```
+
+  KDG.Database.Database.PostgreSQL.Upsert<T>(
+    Npgsql.NpgsqlTransaction t,
+    KDG.Database.DML.UpsertConfig<T> data
+  )
+```
 - Delete
 ```
 

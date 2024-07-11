@@ -99,12 +99,6 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
         using var command = transaction.Connection.CreateCommand();
         command.Transaction = transaction;
 
-        // var parameters = config.Fields.Select(field => {
-        //     var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
-        //     command.Parameters.Add(parameter);
-        //     return parameter.ParameterName;
-        // }).ToList();
-
         // add all params
         var allFields = config.Fields
             .Concat(config.Predicates.Select(predicate => new KeyValuePair<string, Func<T, object>>(PredicateParam(predicate.Key), predicate.Value)))
@@ -134,7 +128,46 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
             set {string.Join(",", config.Fields.Select(field => $"{field.Key} = @{field.Key}"))}
             where {composedWhereClause}
         ";
-        Console.WriteLine($"update: {command.CommandText}");
+        await command.ExecuteNonQueryAsync();
+    }
+    public async Task Upsert<T>(
+        Npgsql.NpgsqlTransaction transaction,
+        DML.UpsertConfig<T> config
+    ) {
+        if (transaction.Connection == null)
+        {
+            throw new InvalidOperationException("Transaction does not have an associated connection.");
+        }
+        using var command = transaction.Connection.CreateCommand();
+        command.Transaction = transaction;
+
+
+        var parameters = config.Fields.Select(field => {
+            var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
+            command.Parameters.Add(parameter);
+            return parameter.ParameterName;
+        }).ToList();
+
+        command.CommandText = $@"
+            insert into
+            {config.Table}
+            ({string.Join(",", config.Fields.Select(x => x.Key))})
+            values
+            ({string.Join(",", config.Fields.Select(x => $"@{x.Key}"))})
+            on conflict
+            ({string.Join(",", config.Key.Select(x => x))})
+            do update set
+            {
+                string.Join(",", config.Fields.Select(field => {
+                    if (config.Key.Contains(field.Key)) {
+                        // a bit ugly, but i think this is the only safe way to conditionally upsert when we are only updating a single column
+                        return config.Fields.Count == 1 ? $"{field.Key} = excluded.{field.Key}" : null;
+                    } else {
+                        return $"{field.Key} = excluded.{field.Key}";
+                    }
+                }).Where(field => field != null))
+            }
+        ";
         await command.ExecuteNonQueryAsync();
     }
 

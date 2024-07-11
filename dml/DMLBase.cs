@@ -17,3 +17,6 @@ public class UpdateConfig<T> : ConfigBase<T>,IUpdateConfig<T> {
     public required IEnumerable<string> Key { get; set; }
     public Dictionary<string, Func<T, object>> Predicates { get; set; } = new Dictionary<string, Func<T, object>>{};
 }
+public class UpsertConfig<T> : ConfigBase<T>,IUpsertConfig<T> {
+    public required IEnumerable<string> Key { get; set; }
+}

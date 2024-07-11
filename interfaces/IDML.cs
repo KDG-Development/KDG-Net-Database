@@ -17,3 +17,6 @@ public interface IUpdateConfig<T> : IConfigBase<T> {
     public IEnumerable<string> Key { get; set;}
     public Dictionary<string, Func<T, object>> Predicates { get; set; }
 }
+public interface IUpsertConfig<T> : IConfigBase<T> {
+    public IEnumerable<string> Key { get; set;}
+}
