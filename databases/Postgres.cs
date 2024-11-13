@@ -7,7 +7,7 @@ using KDG.Database.Interfaces;
 
 namespace KDG.Database;
 
-public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTransaction> {
+public class PostgreSQL : DML.PostgreSQL {
     public string ConnectionString { get; set; }
     public PostgreSQL(string connectionString) {
         this.ConnectionString = connectionString;
