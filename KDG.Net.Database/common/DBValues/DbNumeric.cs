@@ -18,6 +18,6 @@ public class DbNumeric : ADbValue
     }
 
     public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder) {
-        return builder.AddParameter(parameterName, Value);
+        return builder.AddParameter(parameterName, Value, NpgsqlTypes.NpgsqlDbType.Numeric);
     }
 }

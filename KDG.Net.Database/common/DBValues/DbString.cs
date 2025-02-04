@@ -17,6 +17,6 @@ public class DbString : ADbValue
     }
 
     public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder) {
-        return builder.AddParameter(parameterName, Value);
+        return builder.AddParameter(parameterName, Value, NpgsqlTypes.NpgsqlDbType.Text);
     }
 }

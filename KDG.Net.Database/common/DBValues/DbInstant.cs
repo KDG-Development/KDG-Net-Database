@@ -15,7 +15,7 @@ namespace KDG.Database.Common
 
         public override NpgsqlParameter AddParameter(string name, IQueryBuilder builder)
         {
-            return builder.AddParameter(name, _value);
+            return builder.AddParameter(name, _value, NpgsqlTypes.NpgsqlDbType.TimestampTz);
         }
 
         public override void HandleWrite(IBulkWriter writer)

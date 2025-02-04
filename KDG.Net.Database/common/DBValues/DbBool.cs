@@ -14,6 +14,6 @@ public class DbBool : ADbValue {
     }
 
     public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder) {
-        return builder.AddParameter(parameterName, _value);
+        return builder.AddParameter(parameterName, _value, NpgsqlTypes.NpgsqlDbType.Boolean);
     }
 }

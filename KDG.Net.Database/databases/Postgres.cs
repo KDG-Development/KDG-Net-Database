@@ -225,10 +225,12 @@ public class PostgreSQL : DML.PostgreSQL {
         using var command = transaction.Connection.CreateCommand();
         command.Transaction = transaction;
 
+        var builder = new QueryBuilder(command);
+
         var parameters = config.Fields.Select(field => {
-            var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
-            command.Parameters.Add(parameter);
-            return parameter.ParameterName;
+            field.Value(config.Data)
+                .AddParameter(field.Key, builder);
+            return field.Key;
         }).ToList();
 
         command.CommandText = $@"

@@ -81,14 +81,14 @@ public class DbNullableTests
         int? value = 42;
         var nullableValue = new DbNullable<int>(value.ToOption(), (i) => new DbNumeric(i));
         var expectedParam = new NpgsqlParameter();
-        mockBuilder.Setup(b => b.AddParameter("param", (decimal)value)).Returns(expectedParam);
+        mockBuilder.Setup(b => b.AddParameter("param", (decimal)value, NpgsqlTypes.NpgsqlDbType.Numeric)).Returns(expectedParam);
 
         // Act
         var result = nullableValue.AddParameter("param", mockBuilder.Object);
 
         // Verify
         Assert.Same(expectedParam, result);
-        mockBuilder.Verify(b => b.AddParameter("param", (decimal)value), Times.Once);
+        mockBuilder.Verify(b => b.AddParameter("param", (decimal)value, NpgsqlTypes.NpgsqlDbType.Numeric), Times.Once);
         mockBuilder.Verify(b => b.AddNull("param"), Times.Never);
     }
 
@@ -110,6 +110,8 @@ public class DbNullableTests
         mockBuilder.Verify(b => b.AddNull("param"), Times.Once);
     }
 
+    public string? TestValue() => "Hello, World!";
+
     [Fact]
     public void AddParameter_WithReference_AddsValueParameter()
     {
@@ -118,14 +120,14 @@ public class DbNullableTests
         string? value = "Hello, World!";
         var nullableString = new DbNullable<string>(value.ToOption(), s => new DbString(s));
         var expectedParam = new NpgsqlParameter();
-        mockBuilder.Setup(b => b.AddParameter("param", value)).Returns(expectedParam);
+        mockBuilder.Setup(b => b.AddParameter("param", value, NpgsqlTypes.NpgsqlDbType.Text)).Returns(expectedParam);
 
         // Act
         var result = nullableString.AddParameter("param", mockBuilder.Object);
 
         // Verify
         Assert.Same(expectedParam, result);
-        mockBuilder.Verify(b => b.AddParameter("param", value), Times.Once);
+        mockBuilder.Verify(b => b.AddParameter("param", value, NpgsqlTypes.NpgsqlDbType.Text), Times.Once);
         mockBuilder.Verify(b => b.AddNull("param"), Times.Never);
     }
 }

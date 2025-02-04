@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace KDG.Database.Services;
 
@@ -23,9 +24,10 @@ public class QueryBuilder : IQueryBuilder
         return parameter;
     }
 
-    public NpgsqlParameter AddParameter(string parameterName, object value)
+    public NpgsqlParameter AddParameter(string parameterName, object value, NpgsqlDbType npgsqlDbType)
     {
-        var parameter = new NpgsqlParameter(parameterName, value);
+        var parameter = new NpgsqlParameter(parameterName, npgsqlDbType);
+        parameter.Value = value;
         _command.Parameters.Add(parameter);
         return parameter;
     }
