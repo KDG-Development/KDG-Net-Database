@@ -13,7 +13,9 @@ public class PostgreSQL : DML.PostgreSQL {
     public PostgreSQL(string connectionString) {
         this.ConnectionString = connectionString;
     }
-    public async Task<A> withConnection<A>(Func<NpgsqlConnection, Task<A>> execute) {
+    [Obsolete("Use WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) instead.")]
+    public Task<A> withConnection<A>(Func<NpgsqlConnection, Task<A>> execute) => WithConnection(execute);
+    public async Task<A> WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) {
         A result;
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeInstant());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeLocalDate());
@@ -36,7 +38,7 @@ public class PostgreSQL : DML.PostgreSQL {
         return result;
     }
 
-    private async Task<A> mapConnectionToTransaction<A>(NpgsqlConnection conn, Func<NpgsqlTransaction, Task<A>> execute) {
+    private async Task<A> MapConnectionToTransaction<A>(NpgsqlConnection conn, Func<NpgsqlTransaction, Task<A>> execute) {
         using var transaction = conn.BeginTransaction();
         {
             try {
@@ -49,10 +51,11 @@ public class PostgreSQL : DML.PostgreSQL {
             }
         }
     }
-
-    public async Task<A> withTransaction<A>(Func<NpgsqlTransaction, Task<A>> execute) {
-        return await withConnection((conn) => {
-            return mapConnectionToTransaction(conn, execute);
+    [Obsolete("Use WithTransaction<A>(Func<NpgsqlTransaction, Task<A>> execute) instead.")]
+    public Task<A> withTransaction<A>(Func<NpgsqlTransaction, Task<A>> execute) => WithTransaction(execute);
+    public async Task<A> WithTransaction<A>(Func<NpgsqlTransaction, Task<A>> execute) {
+        return await WithConnection((conn) => {
+            return MapConnectionToTransaction(conn, execute);
         });
     }
 
