@@ -56,8 +56,8 @@ Here's what a full example might look like:
 
 ```
 var db = new KDG.Database.PostgreSQL("connection-string");
-await db.withTransaction(t => {
-  db.Insert(
+await db.withTransaction(async t => {
+  await db.Insert(
     t,
     new KDG.Database.DML.InsertConfig<UserModel>{
       Table="your-table",
