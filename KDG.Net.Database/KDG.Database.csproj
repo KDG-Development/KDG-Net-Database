@@ -2,13 +2,14 @@
 
   <PropertyGroup>
      <PackageId>KDG-Net-Database</PackageId>
-     <Version>0.0.3</Version>
+     <Version>0.0.7</Version>
      <Authors>Kyle David Group</Authors>
      <Company>Kyle David Group</Company>
      <Description>A wrapper for common database access implementations</Description>
      <PackageTags>migrations</PackageTags>
      <PackageLicenseFile>LICENSE</PackageLicenseFile>
      <PackageReadmeFile>README.md</PackageReadmeFile>
+     <RestoreSources>$(RestoreSources);https://api.nuget.org/v3/index.json;https://nuget.hangfire.io/nuget/hangfire-pro/v3/index.json;./packages</RestoreSources>
    </PropertyGroup>
 
   <PropertyGroup>
@@ -18,11 +19,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="LICENSE" Pack="true" PackagePath=""/>
-    <None Include="README.md" Pack="true" PackagePath=""/>
+    <None Include="LICENSE" Pack="true" PackagePath="" />
+    <None Include="README.md" Pack="true" PackagePath="" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="KDG-Net-Common" Version="0.0.3" />
+    <PackageReference Include="Moq" Version="4.20.72" />
     <PackageReference Include="Npgsql" Version="8.0.3" />
     <PackageReference Include="Npgsql.NodaTime" Version="8.0.3" />
     <PackageReference Include="Dapper" Version="2.1.35" />

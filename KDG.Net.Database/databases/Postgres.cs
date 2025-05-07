@@ -1,13 +1,14 @@
 using NodaTime;
 using Npgsql;
 using System.Data;
+using KDG.Database.Services;
 using System.Text.RegularExpressions;
 using KDG.Database.Common;
 using KDG.Database.Interfaces;
 
 namespace KDG.Database;
 
-public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTransaction> {
+public class PostgreSQL : DML.PostgreSQL {
     public string ConnectionString { get; set; }
     public PostgreSQL(string connectionString) {
         this.ConnectionString = connectionString;
@@ -19,7 +20,7 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeNullableInstant());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeNullableLocalDate());
         // todo: option handlers here or downstream?
-        
+
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(this.ConnectionString);
         dataSourceBuilder.UseNodaTime();
         await using var dataSource = dataSourceBuilder.Build();
@@ -55,6 +56,44 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
         });
     }
 
+    private string _escape(string s)
+    {
+      return s.Replace(@"""", @"""""");
+    }
+
+    private Task _executeBulk<A>(NpgsqlTransaction transaction, IEnumerable<A> records, DML.BulkInsertConfig<A> config)
+    {
+        var fields = string.Join(",", config.Fields.Select((v) => _escape(v.Key)));
+
+        if (transaction.Connection == null)
+        {
+            throw new NullReferenceException("Transaction doesn't have a connection.");
+        }
+        using var writer = transaction.Connection.BeginBinaryImport(string.Format(@"
+            COPY {0}(
+            {1}
+            ) FROM STDIN(FORMAT BINARY)
+        ", _escape(config.Table), fields));
+        var bulkWriter = new BulkWriter(writer);
+        foreach (var record in records)
+        {
+            writer.StartRow();
+            foreach (var field in config.Fields)
+            {
+                var t = field.Value(record);
+                t.HandleWrite(bulkWriter);
+            }
+        }
+        writer.Complete();
+        writer.Dispose();
+        return Task.CompletedTask;
+    }
+
+    public async Task BulkInsert<A>(Npgsql.NpgsqlTransaction transaction, IEnumerable<A> records, DML.BulkInsertConfig<A> config)
+    {
+        await _executeBulk(transaction, records, config);
+    }
+
     // parameter utilities
     private static string PredicateParam(string s) {
         return $"_predicate_{s}";
@@ -71,10 +110,12 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
         using var command = transaction.Connection.CreateCommand();
         command.Transaction = transaction;
 
+        var builder = new QueryBuilder(command);
+
         var parameters = config.Fields.Select(field => {
-            var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
-            command.Parameters.Add(parameter);
-            return parameter.ParameterName;
+            field.Value(config.Data)
+                .AddParameter(field.Key, builder);
+            return $"@{field.Key}";
         }).ToList();
 
         command.CommandText = $@"
@@ -101,19 +142,20 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
 
         // add all params
         var allFields = config.Fields
-            .Concat(config.Predicates.Select(predicate => new KeyValuePair<string, Func<T, object>>(PredicateParam(predicate.Key), predicate.Value)))
-            .Concat(config.Key.Select(key => new KeyValuePair<string, Func<T, object>>(key, data => data!)))
+            .Concat(config.Predicates.Select(predicate => new KeyValuePair<string, Func<T, ADbValue>>(PredicateParam(predicate.Key), predicate.Value)))
+            .Concat(config.Key)
             .GroupBy(pair => pair.Key)
             .ToDictionary(group => group.Key, group => group.First().Value);
 
+        var builder = new QueryBuilder(command);
         var parameters = allFields.Select(field => {
-            var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
-            command.Parameters.Add(parameter);
-            return parameter.ParameterName;
+            field.Value(config.Data)
+                .AddParameter(field.Key, builder);
+            return field.Key;
         }).ToList();
 
         var keyClause =
-            string.Join(" and ", config.Key.Select(field => $"{field} = @{field}"));
+            string.Join(" and ", config.Key.Select(field => $"{field.Key} = @{field.Key}"));
         var predicateClause =
             string.Join(" and ", config.Predicates.Select(predicate => $"{predicate.Key} = @{PredicateParam(predicate.Key)}"));
 
@@ -141,11 +183,12 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
         using var command = transaction.Connection.CreateCommand();
         command.Transaction = transaction;
 
+        var builder = new QueryBuilder(command);
 
         var parameters = config.Fields.Select(field => {
-            var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
-            command.Parameters.Add(parameter);
-            return parameter.ParameterName;
+            field.Value(config.Data)
+                .AddParameter(field.Key, builder);
+            return field.Key;
         }).ToList();
 
         command.CommandText = $@"
@@ -155,11 +198,11 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
             values
             ({string.Join(",", config.Fields.Select(x => $"@{x.Key}"))})
             on conflict
-            ({string.Join(",", config.Key.Select(x => x))})
+            ({string.Join(",", config.Key.Select(x => x.Key))})
             do update set
             {
                 string.Join(",", config.Fields.Select(field => {
-                    if (config.Key.Contains(field.Key)) {
+                    if (config.Key.Select(x => x.Key).Contains(field.Key)) {
                         // a bit ugly, but i think this is the only safe way to conditionally upsert when we are only updating a single column
                         return config.Fields.Count == 1 ? $"{field.Key} = excluded.{field.Key}" : null;
                     } else {
@@ -182,10 +225,12 @@ public class PostgreSQL : DML.PostgreSQL, IDatabase<NpgsqlConnection,NpgsqlTrans
         using var command = transaction.Connection.CreateCommand();
         command.Transaction = transaction;
 
+        var builder = new QueryBuilder(command);
+
         var parameters = config.Fields.Select(field => {
-            var parameter = new NpgsqlParameter($"@{field.Key}", field.Value(config.Data));
-            command.Parameters.Add(parameter);
-            return parameter.ParameterName;
+            field.Value(config.Data)
+                .AddParameter(field.Key, builder);
+            return field.Key;
         }).ToList();
 
         command.CommandText = $@"
