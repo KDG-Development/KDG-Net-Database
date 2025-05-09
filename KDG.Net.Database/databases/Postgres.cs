@@ -97,6 +97,74 @@ public class PostgreSQL : DML.PostgreSQL {
         await _executeBulk(transaction, records, config);
     }
 
+    public async Task BulkUpsert<A>(
+        Npgsql.NpgsqlTransaction transaction,
+        IEnumerable<A> records,
+        DML.BulkUpsertConfig<A> config
+    ) {
+        if (transaction.Connection == null)
+        {
+            throw new InvalidOperationException("Transaction does not have an associated connection.");
+        }
+
+        var tempTable = $"__{config.Table}";
+
+        // Drop temp table if exists
+        using (var dropCommand = transaction.Connection.CreateCommand())
+        {
+            dropCommand.Transaction = transaction;
+            dropCommand.CommandText = $"DROP TABLE IF EXISTS {_escape(tempTable)}";
+            await dropCommand.ExecuteNonQueryAsync();
+        }
+
+        // Create temp table
+        using (var createCommand = transaction.Connection.CreateCommand())
+        {
+            createCommand.Transaction = transaction;
+            createCommand.CommandText = $"CREATE TEMP TABLE {_escape(tempTable)} AS (SELECT * FROM {_escape(config.Table)} LIMIT 0)";
+            await createCommand.ExecuteNonQueryAsync();
+        }
+
+        // Build update clause
+        var updateClause = string.Join(",", config.Fields
+            .Where(field => !config.Ignore.Contains(field.Key))
+            .Select(field => $"{_escape(field.Key)} = EXCLUDED.{_escape(field.Key)}"));
+
+        // Build key clause
+        var keyClause = string.Join(",", config.Key.Select(k => _escape(k)));
+
+        // Build fields list
+        var fields = string.Join(",", config.Fields.Select(f => _escape(f.Key)));
+
+        // Bulk insert into temp table
+        await _executeBulk(transaction, records, new DML.BulkInsertConfig<A> {
+            Table = tempTable,
+            Fields = config.Fields
+        });
+
+        // Perform upsert
+        using (var upsertCommand = transaction.Connection.CreateCommand())
+        {
+            upsertCommand.Transaction = transaction;
+            upsertCommand.CommandText = $@"
+                INSERT INTO {_escape(config.Table)} (
+                    {fields}
+                )
+                SELECT {fields} FROM {_escape(tempTable)}
+                ON CONFLICT ({keyClause}) DO UPDATE SET
+                    {updateClause}";
+            await upsertCommand.ExecuteNonQueryAsync();
+        }
+
+        // Drop temp table
+        using (var dropCommand = transaction.Connection.CreateCommand())
+        {
+            dropCommand.Transaction = transaction;
+            dropCommand.CommandText = $"DROP TABLE {_escape(tempTable)}";
+            await dropCommand.ExecuteNonQueryAsync();
+        }
+    }
+
     // parameter utilities
     private static string PredicateParam(string s) {
         return $"_predicate_{s}";

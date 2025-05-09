@@ -28,3 +28,8 @@ public class UpsertConfig<T> : ConfigBase<T>,IUpsertConfig<T> {
 }
 
 public class BulkInsertConfig<T> : BulkConfigBase<T>, IBulkInsertConfig<T> {}
+
+public class BulkUpsertConfig<T> : BulkConfigBase<T>, IBulkUpsertConfig<T> {
+    public required IEnumerable<string> Key { get; set; }
+    public IEnumerable<string> Ignore { get; set; } = new List<string>();
+}
