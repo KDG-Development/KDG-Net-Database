@@ -7,4 +7,5 @@ public interface IDatabase<TConnection, TTransaction> {
     [Obsolete("Use WithTransaction<A>(Func<TTransaction, Task<A>> execute) instead.")]
     Task<A> withTransaction<A>(Func<TTransaction, Task<A>> execute);
     Task<A> WithTransaction<A>(Func<TTransaction, Task<A>> execute);
+    Task<TTransaction> GetTransaction();
 }

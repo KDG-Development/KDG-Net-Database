@@ -15,27 +15,31 @@ public class PostgreSQL : DML.PostgreSQL {
     }
     [Obsolete("Use WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) instead.")]
     public Task<A> withConnection<A>(Func<NpgsqlConnection, Task<A>> execute) => WithConnection(execute);
-    public async Task<A> WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) {
-        A result;
+    private async Task<NpgsqlConnection> CreateConnection() {
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeInstant());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeLocalDate());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeNullableInstant());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeNullableLocalDate());
-        // todo: option handlers here or downstream?
 
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(this.ConnectionString);
         dataSourceBuilder.UseNodaTime();
         await using var dataSource = dataSourceBuilder.Build();
-        {
-            using var connection = dataSource.CreateConnection();
-            {
-                await connection.OpenAsync();
-                result = await execute(connection);
-                await connection.CloseAsync();
-            }
-        }
+        var connection = dataSource.CreateConnection();
+        await connection.OpenAsync();
+        return connection;
+    }
 
+    public async Task<A> WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) {
+        A result;
+        await using var connection = await CreateConnection();
+        result = await execute(connection);
+        await connection.CloseAsync();
         return result;
+    }
+
+    public async Task<NpgsqlTransaction> GetTransaction() {
+        var connection = await CreateConnection();
+        return connection.BeginTransaction();
     }
 
     private async Task<A> MapConnectionToTransaction<A>(NpgsqlConnection conn, Func<NpgsqlTransaction, Task<A>> execute) {
@@ -58,6 +62,8 @@ public class PostgreSQL : DML.PostgreSQL {
             return MapConnectionToTransaction(conn, execute);
         });
     }
+
+
 
     private string _escape(string s)
     {
