@@ -8,23 +8,30 @@ using KDG.Database.Interfaces;
 
 namespace KDG.Database;
 
-public class PostgreSQL : DML.PostgreSQL {
+public class PostgreSQL : DML.PostgreSQL, IAsyncDisposable {
     public string ConnectionString { get; set; }
+    private readonly NpgsqlDataSource _dataSource;
+
     public PostgreSQL(string connectionString) {
         this.ConnectionString = connectionString;
-    }
-    [Obsolete("Use WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) instead.")]
-    public Task<A> withConnection<A>(Func<NpgsqlConnection, Task<A>> execute) => WithConnection(execute);
-    private async Task<NpgsqlConnection> CreateConnection() {
+
+        // Register type handlers once during construction
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeInstant());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeLocalDate());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeNullableInstant());
         Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.PostgreSQL.NodaTimeNullableLocalDate());
 
+        // Create dataSource once during construction for connection pooling
         var dataSourceBuilder = new NpgsqlDataSourceBuilder(this.ConnectionString);
         dataSourceBuilder.UseNodaTime();
-        await using var dataSource = dataSourceBuilder.Build();
-        var connection = dataSource.CreateConnection();
+        _dataSource = dataSourceBuilder.Build();
+    }
+
+    [Obsolete("Use WithConnection<A>(Func<NpgsqlConnection, Task<A>> execute) instead.")]
+    public Task<A> withConnection<A>(Func<NpgsqlConnection, Task<A>> execute) => WithConnection(execute);
+
+    private async Task<NpgsqlConnection> CreateConnection() {
+        var connection = _dataSource.CreateConnection();
         await connection.OpenAsync();
         return connection;
     }
@@ -33,7 +40,6 @@ public class PostgreSQL : DML.PostgreSQL {
         A result;
         await using var connection = await CreateConnection();
         result = await execute(connection);
-        await connection.CloseAsync();
         return result;
     }
 
@@ -63,7 +69,9 @@ public class PostgreSQL : DML.PostgreSQL {
         });
     }
 
-
+    public async ValueTask DisposeAsync() {
+        await _dataSource.DisposeAsync();
+    }
 
     private string _escape(string s)
     {
