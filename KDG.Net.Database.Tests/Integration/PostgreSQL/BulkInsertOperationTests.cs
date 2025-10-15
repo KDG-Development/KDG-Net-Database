@@ -379,4 +379,123 @@ public class BulkInsertOperationTests : PostgreSQLIntegrationTestBase
         Assert.True(await RowExists(TestTable, "data->>'Title' = 'Article 1'"));
         Assert.True(await RowExists(TestTable, "data->'Tags' @> '[\"tech\"]'"));
     }
+
+    [Fact]
+    public async Task BulkInsert_WithDbFloat_InsertsCorrectly()
+    {
+        // Arrange
+        await CreateTestTable(TestTable, @"
+            id UUID PRIMARY KEY,
+            measurement REAL NOT NULL,
+            score REAL NOT NULL
+        ");
+
+        var records = new[]
+        {
+            new { Id = Guid.NewGuid(), Measurement = 12.34f, Score = 98.7f },
+            new { Id = Guid.NewGuid(), Measurement = 56.78f, Score = 87.6f },
+            new { Id = Guid.NewGuid(), Measurement = 90.12f, Score = 76.5f }
+        };
+
+        var config = new BulkInsertConfig<object>
+        {
+            Table = TestTable,
+            Fields = new Dictionary<string, Func<object, ADbValue>>
+            {
+                { "id", r => new DbGuid(((dynamic)r).Id) },
+                { "measurement", r => new DbFloat(((dynamic)r).Measurement) },
+                { "score", r => new DbFloat(((dynamic)r).Score) }
+            }
+        };
+
+        // Act
+        await Database.WithTransaction(async transaction =>
+        {
+            await Database.BulkInsert(transaction, records, config);
+            return true;
+        });
+
+        // Assert
+        Assert.Equal(3, await GetRowCount(TestTable));
+    }
+
+    [Fact]
+    public async Task BulkInsert_WithDbInstant_InsertsCorrectly()
+    {
+        // Arrange
+        await CreateTestTable(TestTable, @"
+            id UUID PRIMARY KEY,
+            event_time TIMESTAMPTZ NOT NULL
+        ");
+
+        var baseTime = NodaTime.SystemClock.Instance.GetCurrentInstant();
+        var records = new[]
+        {
+            new { Id = Guid.NewGuid(), EventTime = baseTime },
+            new { Id = Guid.NewGuid(), EventTime = baseTime.Plus(NodaTime.Duration.FromMinutes(10)) },
+            new { Id = Guid.NewGuid(), EventTime = baseTime.Plus(NodaTime.Duration.FromMinutes(20)) }
+        };
+
+        var config = new BulkInsertConfig<object>
+        {
+            Table = TestTable,
+            Fields = new Dictionary<string, Func<object, ADbValue>>
+            {
+                { "id", r => new DbGuid(((dynamic)r).Id) },
+                { "event_time", r => new DbInstant(((dynamic)r).EventTime) }
+            }
+        };
+
+        // Act
+        await Database.WithTransaction(async transaction =>
+        {
+            await Database.BulkInsert(transaction, records, config);
+            return true;
+        });
+
+        // Assert
+        Assert.Equal(3, await GetRowCount(TestTable));
+    }
+
+    [Fact]
+    public async Task BulkInsert_WithDbInt_InsertsCorrectly()
+    {
+        // Arrange
+        await CreateTestTable(TestTable, @"
+            id UUID PRIMARY KEY,
+            counter INTEGER NOT NULL,
+            quantity INTEGER NOT NULL
+        ");
+
+        var records = new[]
+        {
+            new { Id = Guid.NewGuid(), Counter = 10, Quantity = 100 },
+            new { Id = Guid.NewGuid(), Counter = 20, Quantity = 200 },
+            new { Id = Guid.NewGuid(), Counter = 30, Quantity = 300 }
+        };
+
+        var config = new BulkInsertConfig<object>
+        {
+            Table = TestTable,
+            Fields = new Dictionary<string, Func<object, ADbValue>>
+            {
+                { "id", r => new DbGuid(((dynamic)r).Id) },
+                { "counter", r => new DbInt(((dynamic)r).Counter) },
+                { "quantity", r => new DbInt(((dynamic)r).Quantity) }
+            }
+        };
+
+        // Act
+        await Database.WithTransaction(async transaction =>
+        {
+            await Database.BulkInsert(transaction, records, config);
+            return true;
+        });
+
+        // Assert
+        Assert.Equal(3, await GetRowCount(TestTable));
+        Assert.True(await RowExists(TestTable, "counter = 10 AND quantity = 100"));
+        Assert.True(await RowExists(TestTable, "counter = 20 AND quantity = 200"));
+        Assert.True(await RowExists(TestTable, "counter = 30 AND quantity = 300"));
+    }
 }

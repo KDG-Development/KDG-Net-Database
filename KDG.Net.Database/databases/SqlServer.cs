@@ -36,6 +36,18 @@ public class SqlServer : DML.SqlServer {
         return result;
     }
 
+    public async Task<SqlTransaction> GetTransaction() {
+        // Register NodaTime type handlers for Dapper
+        Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.SqlServer.NodaTimeInstant());
+        Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.SqlServer.NodaTimeLocalDate());
+        Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.SqlServer.NodaTimeNullableInstant());
+        Dapper.SqlMapper.AddTypeHandler(new KDG.Database.TypeMappers.SqlServer.NodaTimeNullableLocalDate());
+
+        var connection = new SqlConnection(this.ConnectionString);
+        await connection.OpenAsync();
+        return connection.BeginTransaction();
+    }
+
     private async Task<A> MapConnectionToTransaction<A>(SqlConnection conn, Func<SqlTransaction, Task<A>> execute) {
         using var transaction = conn.BeginTransaction();
         {
@@ -122,6 +134,13 @@ public class SqlServer : DML.SqlServer {
 
     private Type GetColumnTypeFromDbValue(ADbValue dbValue)
     {
+        // Handle DbNullable types by checking the generic type parameter
+        if (dbValue.GetType().IsGenericType && dbValue.GetType().GetGenericTypeDefinition() == typeof(DbNullable<>))
+        {
+            var genericArg = dbValue.GetType().GetGenericArguments()[0];
+            return genericArg;
+        }
+
         return dbValue switch
         {
             DbGuid => typeof(Guid),
@@ -129,8 +148,9 @@ public class SqlServer : DML.SqlServer {
             DbNumeric => typeof(decimal),
             DbBool => typeof(bool),
             DbFloat => typeof(float),
+            DbInt => typeof(int),
             DbDate => typeof(DateTime),
-            DbInstant => typeof(DateTime),
+            DbInstant => typeof(DateTimeOffset),
             DbJson => typeof(string),
             _ => typeof(object)
         };
@@ -138,6 +158,27 @@ public class SqlServer : DML.SqlServer {
 
     private object? GetValueFromDbValue(ADbValue dbValue)
     {
+        // Handle DbNullable types by mimicking what HandleWrite does
+        if (dbValue.GetType().IsGenericType && dbValue.GetType().GetGenericTypeDefinition() == typeof(DbNullable<>))
+        {
+            // For SQL Server bulk insert, we need to extract the actual value from Option<T>
+            // We'll do this by calling the same Match pattern that HandleWrite uses
+            
+            // Create a temporary in-memory writer to capture what HandleWrite would do
+            var capturedValue = new CaptureDbValue();
+            
+            // Call HandleWrite which will use Match internally
+            try
+            {
+                dbValue.HandleWrite(capturedValue);
+                return capturedValue.Value;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         return dbValue switch
         {
             DbGuid guid => typeof(DbGuid).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(guid),
@@ -145,11 +186,28 @@ public class SqlServer : DML.SqlServer {
             DbNumeric num => num.Value,
             DbBool b => typeof(DbBool).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(b),
             DbFloat f => typeof(DbFloat).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(f),
+            DbInt i => typeof(DbInt).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(i),
             DbDate date => ((NodaTime.LocalDate)typeof(DbDate).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(date)!).ToDateTimeUnspecified(),
-            DbInstant instant => ((NodaTime.Instant)typeof(DbInstant).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(instant)!).ToDateTimeUtc(),
+            DbInstant instant => ((NodaTime.Instant)typeof(DbInstant).GetField("_value", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(instant)!).ToDateTimeOffset(),
             DbJson json => json.Value,
             _ => null
         };
+    }
+    
+    // Helper class to capture the value that would be written by HandleWrite
+    private class CaptureDbValue : IBulkWriter
+    {
+        public object? Value { get; private set; }
+        
+        public void Write<A>(A value, Common.DbType dbType)
+        {
+            Value = value;
+        }
+        
+        public void WriteNull()
+        {
+            Value = null;
+        }
     }
 
     public async Task BulkInsert<A>(SqlTransaction transaction, IEnumerable<A> records, DML.BulkInsertConfig<A> config)

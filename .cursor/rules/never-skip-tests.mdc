@@ -1,0 +1,64 @@
+---
+alwaysApply: true
+description: Guidelines for handling failing tests - never skip them
+---
+
+# Never Skip Tests
+
+## Core Principle
+**NEVER skip tests using `Skip` attributes or similar mechanisms.** Tests exist to verify functionality - skipping them defeats their entire purpose.
+
+## What NOT to Do
+
+❌ **DO NOT** add skip attributes to failing tests:
+```csharp
+[Fact(Skip = "This needs investigation")]  // WRONG!
+public async Task SomeTest() { }
+```
+
+❌ **DO NOT** comment out failing tests
+❌ **DO NOT** remove failing tests
+❌ **DO NOT** mark tests as ignored/skipped
+
+## What TO Do Instead
+
+✅ **DO** debug and fix failing tests properly:
+1. Investigate the root cause of the failure
+2. Add better error messages to understand what's failing
+3. Fix the underlying implementation issue
+4. Ensure all tests pass before completing work
+
+✅ **DO** add helpful assertions with descriptive messages:
+```csharp
+Assert.True(await RowExists(table, condition), "Row with expected data not found");
+```
+
+✅ **DO** use the test suite to drive development:
+- Tests are the specification
+- Failing tests indicate bugs or missing features
+- All tests must pass for the work to be complete
+
+## Why This Matters
+
+Tests are critical for:
+- **Regression prevention**: Ensuring new changes don't break existing functionality
+- **Documentation**: Tests show how the code should work
+- **Confidence**: A passing test suite means the code works as expected
+- **Quality**: Comprehensive test coverage ensures all code paths are verified
+
+## When a Test Fails
+
+1. **Read the error message carefully** - understand what's actually failing
+2. **Add more detailed assertions** if needed to pinpoint the issue
+3. **Debug the implementation** - use logging, breakpoints, or additional test output
+4. **Fix the root cause** - don't work around it
+5. **Verify all tests pass** before considering the work done
+
+## Exception
+
+The ONLY acceptable reason to skip a test temporarily is if:
+- External dependencies are unavailable (e.g., database not running)
+- The test is for a feature explicitly marked as "coming soon"
+- **AND** there's a tracked issue/ticket to re-enable it
+
+Even then, prefer fixing the issue immediately over skipping.

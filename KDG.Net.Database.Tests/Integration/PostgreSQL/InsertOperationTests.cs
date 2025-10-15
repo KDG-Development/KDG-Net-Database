@@ -260,4 +260,114 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
         Assert.True(await RowExists(TestTable, "data->'Tags' @> '[\"tech\"]'"));
         Assert.True(await RowExists(TestTable, "data->'Metadata'->>'author' = 'John Doe'"));
     }
+
+    [Fact]
+    public async Task Insert_WithDbFloat_InsertsCorrectly()
+    {
+        // Arrange
+        await CreateTestTable(TestTable, @"
+            id UUID PRIMARY KEY,
+            temperature REAL NOT NULL,
+            humidity REAL NOT NULL
+        ");
+
+        var testId = Guid.NewGuid();
+
+        var config = new InsertConfig<object>
+        {
+            Table = TestTable,
+            Data = new { },
+            Fields = new Dictionary<string, Func<object, ADbValue>>
+            {
+                { "id", _ => new DbGuid(testId) },
+                { "temperature", _ => new DbFloat(23.5f) },
+                { "humidity", _ => new DbFloat(65.2f) }
+            }
+        };
+
+        // Act
+        await Database.WithTransaction(async transaction =>
+        {
+            await Database.Insert(transaction, config);
+            return true;
+        });
+
+        // Assert
+        Assert.Equal(1, await GetRowCount(TestTable));
+        Assert.True(await RowExists(TestTable, $"id = '{testId}'"));
+    }
+
+    [Fact]
+    public async Task Insert_WithDbInstant_InsertsCorrectly()
+    {
+        // Arrange
+        await CreateTestTable(TestTable, @"
+            id UUID PRIMARY KEY,
+            created_at TIMESTAMPTZ NOT NULL,
+            updated_at TIMESTAMPTZ NOT NULL
+        ");
+
+        var testId = Guid.NewGuid();
+        var now = NodaTime.SystemClock.Instance.GetCurrentInstant();
+        var earlier = now.Minus(NodaTime.Duration.FromHours(1));
+
+        var config = new InsertConfig<object>
+        {
+            Table = TestTable,
+            Data = new { },
+            Fields = new Dictionary<string, Func<object, ADbValue>>
+            {
+                { "id", _ => new DbGuid(testId) },
+                { "created_at", _ => new DbInstant(earlier) },
+                { "updated_at", _ => new DbInstant(now) }
+            }
+        };
+
+        // Act
+        await Database.WithTransaction(async transaction =>
+        {
+            await Database.Insert(transaction, config);
+            return true;
+        });
+
+        // Assert
+        Assert.Equal(1, await GetRowCount(TestTable));
+        Assert.True(await RowExists(TestTable, $"id = '{testId}'"));
+    }
+
+    [Fact]
+    public async Task Insert_WithDbInt_InsertsCorrectly()
+    {
+        // Arrange
+        await CreateTestTable(TestTable, @"
+            id UUID PRIMARY KEY,
+            count INTEGER NOT NULL,
+            quantity INTEGER NOT NULL
+        ");
+
+        var testId = Guid.NewGuid();
+
+        var config = new InsertConfig<object>
+        {
+            Table = TestTable,
+            Data = new { },
+            Fields = new Dictionary<string, Func<object, ADbValue>>
+            {
+                { "id", _ => new DbGuid(testId) },
+                { "count", _ => new DbInt(42) },
+                { "quantity", _ => new DbInt(100) }
+            }
+        };
+
+        // Act
+        await Database.WithTransaction(async transaction =>
+        {
+            await Database.Insert(transaction, config);
+            return true;
+        });
+
+        // Assert
+        Assert.Equal(1, await GetRowCount(TestTable));
+        Assert.True(await RowExists(TestTable, $"id = '{testId}' AND count = 42 AND quantity = 100"));
+    }
 }

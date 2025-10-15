@@ -14,7 +14,9 @@ namespace KDG.Database.Common
 
         public override IDbDataParameter AddParameter(string name, IQueryBuilder builder)
         {
-            return builder.AddParameter(name, _value, DbType.TimestampTz);
+            // Convert NodaTime.Instant to DateTimeOffset for SQL Server compatibility
+            var dateTimeOffset = _value.ToDateTimeOffset();
+            return builder.AddParameter(name, dateTimeOffset, DbType.TimestampTz);
         }
 
         public override void HandleWrite(IBulkWriter writer)

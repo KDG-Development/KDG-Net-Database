@@ -34,7 +34,7 @@ public class SqlServerQueryBuilder : IQueryBuilder
             DbType.DoublePrecision => SqlDbType.Float,
             DbType.Boolean => SqlDbType.Bit,
             DbType.Date => SqlDbType.Date,
-            DbType.TimestampTz => SqlDbType.DateTime2,
+            DbType.TimestampTz => SqlDbType.DateTimeOffset,
             DbType.Timestamp => SqlDbType.DateTime2,
             DbType.Uuid => SqlDbType.UniqueIdentifier,
             DbType.Jsonb => SqlDbType.NVarChar, // SQL Server uses nvarchar(max) for JSON
