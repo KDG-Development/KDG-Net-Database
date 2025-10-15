@@ -230,15 +230,15 @@ public class PostgreSQL : DML.PostgreSQL {
 
         var builder = new QueryBuilder(command);
 
-        var parameters = config.Fields.Select(field => {
+        // Add all parameters first
+        foreach (var field in config.Fields) {
             field.Value(config.Data)
                 .AddParameter(field.Key, builder);
-            return field.Key;
-        }).ToList();
+        }
 
         command.CommandText = $@"
             delete from {config.Table}
-            where {string.Join(" and ", config.Fields.Select(predicate => $"{predicate.Key} = @{predicate.Key}"))}
+            where {string.Join(" and ", config.Fields.Select(field => $"{field.Key} = @{field.Key}"))}
         ";
 
         await command.ExecuteNonQueryAsync();

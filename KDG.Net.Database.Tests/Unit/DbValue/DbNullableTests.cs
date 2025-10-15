@@ -4,7 +4,7 @@ using Moq;
 using KDG.Database.Interfaces;
 using KDG.Common;
 
-namespace KDG.Database.Tests.DbValue;
+namespace KDG.Database.Tests.Unit.DbValue;
 
 
 public class DbNullableTests
@@ -131,3 +131,4 @@ public class DbNullableTests
         mockBuilder.Verify(b => b.AddNull("param"), Times.Never);
     }
 }
+

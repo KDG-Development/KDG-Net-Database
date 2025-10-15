@@ -8,21 +8,26 @@ namespace KDG.Database.Common;
 
 public class DbJson : ADbValue
 {
-    private readonly string _value;
+    public string Value { get; }
 
-    public DbJson(string value)
+    public DbJson(string jsonString)
     {
-        _value = value;
+        Value = jsonString;
+    }
+
+    public DbJson(object obj, JsonSerializerOptions? options = null)
+    {
+        Value = JsonSerializer.Serialize(obj, options);
     }
 
     public override void HandleWrite(IBulkWriter writer)
     {
-        writer.Write(_value, NpgsqlDbType.Jsonb);
+        writer.Write(Value, NpgsqlDbType.Jsonb);
     }
 
     public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder)
     {
-        return builder.AddParameter(parameterName, _value, NpgsqlDbType.Jsonb);
+        return builder.AddParameter(parameterName, Value, NpgsqlDbType.Jsonb);
     }
 }
 
