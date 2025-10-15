@@ -1,26 +1,24 @@
-using Npgsql;
-using Testcontainers.PostgreSql;
+using Microsoft.Data.SqlClient;
+using Testcontainers.MsSql;
 using Xunit;
 
 namespace KDG.Database.Tests.Integration;
 
 /// <summary>
-/// Base class for PostgreSQL integration tests using Testcontainers
+/// Base class for SQL Server integration tests using Testcontainers
 /// Provides automatic container lifecycle management and database cleanup between tests
 /// </summary>
-public abstract class PostgreSQLIntegrationTestBase : IAsyncLifetime
+public abstract class SqlServerIntegrationTestBase : IAsyncLifetime
 {
-    private static readonly PostgreSqlContainer _container = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
-        .WithDatabase("kdg_test")
-        .WithUsername("postgres")
-        .WithPassword("postgres")
+    private static readonly MsSqlContainer _container = new MsSqlBuilder()
+        .WithImage("mcr.microsoft.com/mssql/server:2022-latest")
+        .WithPassword("Test@123456")
         .Build();
 
     private static bool _containerInitialized = false;
     private static readonly SemaphoreSlim _initLock = new(1, 1);
 
-    protected KDG.Database.PostgreSQL Database { get; private set; } = null!;
+    protected KDG.Database.SqlServer Database { get; private set; } = null!;
     protected string ConnectionString => _container.GetConnectionString();
 
     /// <summary>
@@ -42,7 +40,7 @@ public abstract class PostgreSQLIntegrationTestBase : IAsyncLifetime
             _initLock.Release();
         }
 
-        Database = new KDG.Database.PostgreSQL(_container.GetConnectionString());
+        Database = new KDG.Database.SqlServer(_container.GetConnectionString());
     }
 
     /// <summary>
@@ -66,8 +64,9 @@ public abstract class PostgreSQLIntegrationTestBase : IAsyncLifetime
             using var cmd = conn.CreateCommand();
             // Drop the table if it exists, then create it fresh
             cmd.CommandText = $@"
-                DROP TABLE IF EXISTS {tableName};
-                CREATE TABLE {tableName} (
+                IF OBJECT_ID('{tableName}', 'U') IS NOT NULL
+                    DROP TABLE [{tableName}];
+                CREATE TABLE [{tableName}] (
                     {columnDefinitions}
                 );
             ";
@@ -84,7 +83,7 @@ public abstract class PostgreSQLIntegrationTestBase : IAsyncLifetime
         return await Database.WithConnection(async conn =>
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT COUNT(*) FROM {tableName}";
+            cmd.CommandText = $"SELECT COUNT(*) FROM [{tableName}]";
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result);
         });
@@ -98,7 +97,7 @@ public abstract class PostgreSQLIntegrationTestBase : IAsyncLifetime
         return await Database.WithConnection(async conn =>
         {
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = $"SELECT COUNT(*) FROM {tableName} WHERE {whereClause}";
+            cmd.CommandText = $"SELECT COUNT(*) FROM [{tableName}] WHERE {whereClause}";
             var result = await cmd.ExecuteScalarAsync();
             return Convert.ToInt32(result) > 0;
         });
@@ -118,3 +117,4 @@ public abstract class PostgreSQLIntegrationTestBase : IAsyncLifetime
         });
     }
 }
+

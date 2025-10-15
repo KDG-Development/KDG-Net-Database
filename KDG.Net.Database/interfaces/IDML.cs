@@ -28,6 +28,6 @@ public interface IUpsertConfig<T> : IConfigBase<T> {
 public interface IBulkInsertConfig<T> : IBulkConfigBase<T> {}
 
 public interface IBulkWriter {
-    public void Write<A>(A value,NpgsqlTypes.NpgsqlDbType npgsqlDbType);
+    public void Write<A>(A value, Common.DbType dbType);
     public void WriteNull();
 }

@@ -1,8 +1,6 @@
 using System.Text.Json;
-using KDG.Database.Common;
 using KDG.Database.Interfaces;
-using Npgsql;
-using NpgsqlTypes;
+using System.Data;
 
 namespace KDG.Database.Common;
 
@@ -22,12 +20,12 @@ public class DbJson : ADbValue
 
     public override void HandleWrite(IBulkWriter writer)
     {
-        writer.Write(Value, NpgsqlDbType.Jsonb);
+        writer.Write(Value, DbType.Jsonb);
     }
 
-    public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder)
+    public override IDbDataParameter AddParameter(string parameterName, IQueryBuilder builder)
     {
-        return builder.AddParameter(parameterName, Value, NpgsqlDbType.Jsonb);
+        return builder.AddParameter(parameterName, Value, DbType.Jsonb);
     }
 }
 

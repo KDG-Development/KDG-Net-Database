@@ -1,6 +1,5 @@
 using KDG.Database.Interfaces;
-using Npgsql;
-using NpgsqlTypes;
+using System.Data;
 
 namespace KDG.Database.Common
 {
@@ -13,14 +12,14 @@ namespace KDG.Database.Common
             _value = value;
         }
 
-        public override NpgsqlParameter AddParameter(string name, IQueryBuilder builder)
+        public override IDbDataParameter AddParameter(string name, IQueryBuilder builder)
         {
-            return builder.AddParameter(name, _value, NpgsqlTypes.NpgsqlDbType.TimestampTz);
+            return builder.AddParameter(name, _value, DbType.TimestampTz);
         }
 
         public override void HandleWrite(IBulkWriter writer)
         {
-            writer.Write(_value, NpgsqlDbType.TimestampTz);
+            writer.Write(_value, DbType.TimestampTz);
         }
     }
 }

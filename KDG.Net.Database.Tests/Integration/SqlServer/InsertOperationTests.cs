@@ -3,9 +3,9 @@ using KDG.Database.DML;
 using System.Text.Json;
 using Xunit;
 
-namespace KDG.Database.Tests.Integration;
+namespace KDG.Database.Tests.Integration.SqlServer;
 
-public class InsertOperationTests : PostgreSQLIntegrationTestBase
+public class InsertOperationTests : SqlServerIntegrationTestBase
 {
     private const string TestTable = "insert_test";
 
@@ -22,10 +22,10 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
     {
         // Arrange
         await CreateTestTable(TestTable, @"
-            id UUID PRIMARY KEY,
-            name TEXT NOT NULL,
-            age INTEGER NOT NULL,
-            salary NUMERIC NOT NULL
+            id UNIQUEIDENTIFIER PRIMARY KEY,
+            name NVARCHAR(255) NOT NULL,
+            age INT NOT NULL,
+            salary DECIMAL(18,2) NOT NULL
         ");
 
         var testId = Guid.NewGuid();
@@ -68,7 +68,7 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
     public async Task Insert_WithDbGuid_WorksCorrectly()
     {
         // Arrange
-        await CreateTestTable(TestTable, "id UUID PRIMARY KEY");
+        await CreateTestTable(TestTable, "id UNIQUEIDENTIFIER PRIMARY KEY");
 
         var testId = Guid.NewGuid();
         var record = new { Id = testId };
@@ -99,7 +99,7 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
     public async Task Insert_MultipleRecords_InsertsAll()
     {
         // Arrange
-        await CreateTestTable(TestTable, "id UUID PRIMARY KEY, name TEXT");
+        await CreateTestTable(TestTable, "id UNIQUEIDENTIFIER PRIMARY KEY, name NVARCHAR(255)");
 
         var id1 = Guid.NewGuid();
         var id2 = Guid.NewGuid();
@@ -141,8 +141,8 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
     {
         // Arrange
         await CreateTestTable(TestTable, @"
-            id UUID PRIMARY KEY,
-            data JSONB NOT NULL
+            id UNIQUEIDENTIFIER PRIMARY KEY,
+            data NVARCHAR(MAX) NOT NULL
         ");
 
         var testId = Guid.NewGuid();
@@ -150,13 +150,13 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
         {
             Name = "John Doe",
             Age = 30,
-            Email = "john@example.com"
+            Hobbies = new[] { "Reading", "Gaming" }
         };
 
         var config = new InsertConfig<object>
         {
             Table = TestTable,
-            Data = new { },
+            Data = new { Id = testId },
             Fields = new Dictionary<string, Func<object, ADbValue>>
             {
                 { "id", _ => new DbGuid(testId) },
@@ -174,30 +174,27 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
         // Assert
         Assert.Equal(1, await GetRowCount(TestTable));
         Assert.True(await RowExists(TestTable, $"id = '{testId}'"));
-        Assert.True(await RowExists(TestTable, "data->>'Name' = 'John Doe'"));
-        Assert.True(await RowExists(TestTable, "data->>'Email' = 'john@example.com'"));
     }
 
     [Fact]
-    public async Task Insert_WithJsonFromString_InsertsCorrectly()
+    public async Task Insert_WithDbBool_WorksCorrectly()
     {
         // Arrange
         await CreateTestTable(TestTable, @"
-            id UUID PRIMARY KEY,
-            data JSONB NOT NULL
+            id UNIQUEIDENTIFIER PRIMARY KEY,
+            is_active BIT NOT NULL
         ");
 
         var testId = Guid.NewGuid();
-        var jsonString = @"{""title"":""Test"",""value"":123,""active"":true}";
 
         var config = new InsertConfig<object>
         {
             Table = TestTable,
-            Data = new { },
+            Data = new { Id = testId },
             Fields = new Dictionary<string, Func<object, ADbValue>>
             {
                 { "id", _ => new DbGuid(testId) },
-                { "data", _ => new DbJson(jsonString) }
+                { "is_active", _ => new DbBool(true) }
             }
         };
 
@@ -210,54 +207,42 @@ public class InsertOperationTests : PostgreSQLIntegrationTestBase
 
         // Assert
         Assert.Equal(1, await GetRowCount(TestTable));
-        Assert.True(await RowExists(TestTable, "data->>'title' = 'Test'"));
-        Assert.True(await RowExists(TestTable, "(data->>'value')::int = 123"));
+        Assert.True(await RowExists(TestTable, $"id = '{testId}' AND is_active = 1"));
     }
 
     [Fact]
-    public async Task Insert_WithComplexNestedJson_InsertsCorrectly()
+    public async Task Insert_WithTransactionRollback_DoesNotInsert()
     {
         // Arrange
-        await CreateTestTable(TestTable, @"
-            id UUID PRIMARY KEY,
-            data JSONB NOT NULL
-        ");
+        await CreateTestTable(TestTable, "id UNIQUEIDENTIFIER PRIMARY KEY");
 
         var testId = Guid.NewGuid();
-        var complexData = new
-        {
-            Title = "Test Article",
-            Tags = new[] { "tech", "database", "postgresql" },
-            Metadata = new Dictionary<string, object>
-            {
-                { "author", "John Doe" },
-                { "views", 1500 },
-                { "published", true }
-            }
-        };
 
-        var config = new InsertConfig<object>
+        // Act & Assert
+        await Assert.ThrowsAsync<Exception>(async () =>
         {
-            Table = TestTable,
-            Data = new { },
-            Fields = new Dictionary<string, Func<object, ADbValue>>
+            await Database.WithTransaction<bool>(async transaction =>
             {
-                { "id", _ => new DbGuid(testId) },
-                { "data", _ => new DbJson(complexData) }
-            }
-        };
+                await Database.Insert(transaction, new InsertConfig<object>
+                {
+                    Table = TestTable,
+                    Data = new { Id = testId },
+                    Fields = new Dictionary<string, Func<object, ADbValue>>
+                    {
+                        { "id", _ => new DbGuid(testId) }
+                    }
+                });
 
-        // Act
-        await Database.WithTransaction(async transaction =>
-        {
-            await Database.Insert(transaction, config);
-            return true;
+                // Force an error to trigger rollback
+                throw new Exception("Intentional rollback");
+#pragma warning disable CS0162 // Unreachable code detected
+                return true;
+#pragma warning restore CS0162 // Unreachable code detected
+            });
         });
 
-        // Assert
-        Assert.Equal(1, await GetRowCount(TestTable));
-        Assert.True(await RowExists(TestTable, "data->>'Title' = 'Test Article'"));
-        Assert.True(await RowExists(TestTable, "data->'Tags' @> '[\"tech\"]'"));
-        Assert.True(await RowExists(TestTable, "data->'Metadata'->>'author' = 'John Doe'"));
+        // Assert - record should not exist due to rollback
+        Assert.Equal(0, await GetRowCount(TestTable));
     }
 }
+

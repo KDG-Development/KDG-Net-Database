@@ -1,5 +1,6 @@
 using KDG.Database.Interfaces;
-using Npgsql;
+using System.Data;
+
 namespace KDG.Database.Common;
 
 public class DbString : ADbValue
@@ -13,10 +14,10 @@ public class DbString : ADbValue
 
     public override void HandleWrite(IBulkWriter writer)
     {
-        writer.Write(Value, NpgsqlTypes.NpgsqlDbType.Text);
+        writer.Write(Value, DbType.Text);
     }
 
-    public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder) {
-        return builder.AddParameter(parameterName, Value, NpgsqlTypes.NpgsqlDbType.Text);
+    public override IDbDataParameter AddParameter(string parameterName, IQueryBuilder builder) {
+        return builder.AddParameter(parameterName, Value, DbType.Text);
     }
 }

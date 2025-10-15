@@ -38,7 +38,7 @@ public class DbNullableTests
 
         // Verify
         mockWriter.Verify(i => i.WriteNull(), Times.Never);
-        mockWriter.Verify(i => i.Write((decimal)value, NpgsqlTypes.NpgsqlDbType.Numeric), Times.Once);
+        mockWriter.Verify(i => i.Write((decimal)value, Common.DbType.Numeric), Times.Once);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public class DbNullableTests
 
         // Verify
         mockWriter.Verify(i => i.WriteNull(), Times.Never);
-        mockWriter.Verify(i => i.Write(value, NpgsqlTypes.NpgsqlDbType.Text), Times.Once);
+        mockWriter.Verify(i => i.Write(value, Common.DbType.Text), Times.Once);
     }
 
     [Fact]
@@ -81,14 +81,14 @@ public class DbNullableTests
         int? value = 42;
         var nullableValue = new DbNullable<int>(value.ToOption(), (i) => new DbNumeric(i));
         var expectedParam = new NpgsqlParameter();
-        mockBuilder.Setup(b => b.AddParameter("param", (decimal)value, NpgsqlTypes.NpgsqlDbType.Numeric)).Returns(expectedParam);
+        mockBuilder.Setup(b => b.AddParameter("param", (decimal)value, Common.DbType.Numeric)).Returns(expectedParam);
 
         // Act
         var result = nullableValue.AddParameter("param", mockBuilder.Object);
 
         // Verify
         Assert.Same(expectedParam, result);
-        mockBuilder.Verify(b => b.AddParameter("param", (decimal)value, NpgsqlTypes.NpgsqlDbType.Numeric), Times.Once);
+        mockBuilder.Verify(b => b.AddParameter("param", (decimal)value, Common.DbType.Numeric), Times.Once);
         mockBuilder.Verify(b => b.AddNull("param"), Times.Never);
     }
 
@@ -120,14 +120,14 @@ public class DbNullableTests
         string? value = "Hello, World!";
         var nullableString = new DbNullable<string>(value.ToOption(), s => new DbString(s));
         var expectedParam = new NpgsqlParameter();
-        mockBuilder.Setup(b => b.AddParameter("param", value, NpgsqlTypes.NpgsqlDbType.Text)).Returns(expectedParam);
+        mockBuilder.Setup(b => b.AddParameter("param", value, Common.DbType.Text)).Returns(expectedParam);
 
         // Act
         var result = nullableString.AddParameter("param", mockBuilder.Object);
 
         // Verify
         Assert.Same(expectedParam, result);
-        mockBuilder.Verify(b => b.AddParameter("param", value, NpgsqlTypes.NpgsqlDbType.Text), Times.Once);
+        mockBuilder.Verify(b => b.AddParameter("param", value, Common.DbType.Text), Times.Once);
         mockBuilder.Verify(b => b.AddNull("param"), Times.Never);
     }
 }
