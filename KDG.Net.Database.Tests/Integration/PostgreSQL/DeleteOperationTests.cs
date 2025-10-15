@@ -2,7 +2,7 @@ using KDG.Database.Common;
 using KDG.Database.DML;
 using Xunit;
 
-namespace KDG.Database.Tests.Integration;
+namespace KDG.Database.Tests.Integration.PostgreSQL;
 
 public class DeleteOperationTests : PostgreSQLIntegrationTestBase
 {

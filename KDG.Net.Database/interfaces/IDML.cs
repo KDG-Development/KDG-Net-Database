@@ -33,6 +33,6 @@ public interface IBulkUpsertConfig<T> : IBulkConfigBase<T> {
 }
 
 public interface IBulkWriter {
-    public void Write<A>(A value,NpgsqlTypes.NpgsqlDbType npgsqlDbType);
+    public void Write<A>(A value, Common.DbType dbType);
     public void WriteNull();
 }

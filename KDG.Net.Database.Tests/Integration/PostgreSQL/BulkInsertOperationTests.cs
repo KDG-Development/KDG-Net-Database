@@ -3,7 +3,7 @@ using KDG.Database.DML;
 using System.Text.Json;
 using Xunit;
 
-namespace KDG.Database.Tests.Integration;
+namespace KDG.Database.Tests.Integration.PostgreSQL;
 
 public class BulkInsertOperationTests : PostgreSQLIntegrationTestBase
 {

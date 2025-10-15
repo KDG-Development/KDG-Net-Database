@@ -1,6 +1,6 @@
 using KDG.Database.Interfaces;
 using NodaTime;
-using Npgsql;
+using System.Data;
 
 namespace KDG.Database.Common;
 
@@ -12,10 +12,10 @@ public class DbDate : ADbValue {
     }
 
     public override void HandleWrite(IBulkWriter writer) {
-        writer.Write(_value, NpgsqlTypes.NpgsqlDbType.Date);
+        writer.Write(_value, DbType.Date);
     }
 
-    public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder) {
-        return builder.AddParameter(parameterName, _value, NpgsqlTypes.NpgsqlDbType.Date);
+    public override IDbDataParameter AddParameter(string parameterName, IQueryBuilder builder) {
+        return builder.AddParameter(parameterName, _value, DbType.Date);
     }
 }

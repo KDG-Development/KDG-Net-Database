@@ -4,7 +4,8 @@ using KDG.Database.Interfaces;
 using KDG.Common;
 using System.Xml.Serialization;
 using System.Runtime.CompilerServices;
-using Npgsql;
+using System.Data;
+
 namespace KDG.Database.Common;
 public class DbNullable<T> : ADbValue
 {
@@ -32,7 +33,7 @@ public class DbNullable<T> : ADbValue
         );
     }
 
-    public override NpgsqlParameter AddParameter(string parameterName, IQueryBuilder builder) {
+    public override IDbDataParameter AddParameter(string parameterName, IQueryBuilder builder) {
         return Value.Match(
             some: (value) => {
                 return Mapper(value).AddParameter(parameterName, builder);

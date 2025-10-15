@@ -1,16 +1,24 @@
 # Getting started
 
+This library provides a unified interface for database operations supporting both PostgreSQL and SQL Server.
+
 ## PostgreSQL
 
 ### Connecting to the database
 
 1. Initialize your database connection
+```csharp
+var db = new KDG.Database.PostgreSQL("your-connection-string");
 ```
-var db = new KDG.Database.Database.PostgreSQL("your-connection-string");
+
+Example connection string:
 ```
-2. Fetch data using `withConnection` and `withTransaction`
+Host=localhost;Port=5432;Database=mydb;Username=user;Password=password
 ```
-var data = db.withConnection(async conn => {
+
+2. Fetch data using `WithConnection` and `WithTransaction`
+```csharp
+var data = await db.WithConnection(async conn => {
   var result = await conn.QueryAsync("select * from table");
   return result;
 });
@@ -18,7 +26,7 @@ var data = db.withConnection(async conn => {
 
 ### DML Operations
 
-The `KDG.Database.Database.PostgreSQL` class has corresponding insert, update, and delete methods
+The `KDG.Database.PostgreSQL` class has corresponding insert, update, upsert, delete, and bulk insert methods
 - Insert
 ```
 
@@ -54,23 +62,114 @@ The `KDG.Database.Database.PostgreSQL` class has corresponding insert, update, a
 
 Here's what a full example might look like:
 
-```
+```csharp
 var db = new KDG.Database.PostgreSQL("connection-string");
-await db.withTransaction(async t => {
+await db.WithTransaction(async t => {
   await db.Insert(
     t,
     new KDG.Database.DML.InsertConfig<UserModel>{
-      Table="your-table",
-      Data=New UserModel(),
-      Fields=new Dictionary<string,Func<UserModel,object>>{
-        "id", x => x.id,
-        "email", x => x.email
+      Table = "your-table",
+      Data = new UserModel(),
+      Fields = new Dictionary<string, Func<UserModel, ADbValue>>{
+        { "id", x => new DbGuid(x.Id) },
+        { "email", x => new DbString(x.Email) }
       },
     }
   );
   return true;
-})
+});
 ```
+
+## SQL Server
+
+### Connecting to the database
+
+1. Initialize your database connection
+```csharp
+var db = new KDG.Database.SqlServer("your-connection-string");
+```
+
+Example connection string:
+```
+Server=localhost;Database=mydb;User Id=sa;Password=YourPassword;TrustServerCertificate=True
+```
+
+2. Fetch data using `WithConnection` and `WithTransaction`
+```csharp
+var data = await db.WithConnection(async conn => {
+  var result = await conn.QueryAsync("SELECT * FROM [table]");
+  return result;
+});
+```
+
+### DML Operations
+
+The `KDG.Database.SqlServer` class has corresponding insert, update, upsert (MERGE), delete, and bulk insert methods.
+
+#### Insert Example
+```csharp
+await db.WithTransaction(async transaction => {
+  await db.Insert(transaction, new InsertConfig<UserModel> {
+    Table = "Users",
+    Data = new UserModel { Id = Guid.NewGuid(), Email = "user@example.com" },
+    Fields = new Dictionary<string, Func<UserModel, ADbValue>> {
+      { "id", u => new DbGuid(u.Id) },
+      { "email", u => new DbString(u.Email) }
+    }
+  });
+  return true;
+});
+```
+
+#### Upsert Example (MERGE)
+```csharp
+await db.WithTransaction(async transaction => {
+  await db.Upsert(transaction, new UpsertConfig<UserModel> {
+    Table = "Users",
+    Data = user,
+    Key = new Dictionary<string, Func<UserModel, ADbValue>> {
+      { "id", u => new DbGuid(u.Id) }
+    },
+    Fields = new Dictionary<string, Func<UserModel, ADbValue>> {
+      { "id", u => new DbGuid(u.Id) },
+      { "email", u => new DbString(u.Email) },
+      { "name", u => new DbString(u.Name) }
+    }
+  });
+  return true;
+});
+```
+
+#### Bulk Insert Example (SqlBulkCopy)
+```csharp
+var users = GetLargeUserList(); // Returns IEnumerable<UserModel>
+
+await db.WithTransaction(async transaction => {
+  await db.BulkInsert(transaction, users, new BulkInsertConfig<UserModel> {
+    Table = "Users",
+    Fields = new Dictionary<string, Func<UserModel, ADbValue>> {
+      { "id", u => new DbGuid(u.Id) },
+      { "email", u => new DbString(u.Email) },
+      { "name", u => new DbString(u.Name) }
+    }
+  });
+  return true;
+});
+```
+
+### Supported Data Types
+
+Both PostgreSQL and SQL Server implementations support the following `ADbValue` types:
+
+- `DbString` - Text/NVARCHAR
+- `DbNumeric` - Numeric/Decimal types (decimal, int, float)
+- `DbGuid` - UUID/UNIQUEIDENTIFIER
+- `DbBool` - Boolean/BIT
+- `DbDate` - Date types (NodaTime.LocalDate)
+- `DbInstant` - Timestamp types (NodaTime.Instant)
+- `DbJson` - JSON/JSONB (PostgreSQL) or NVARCHAR(MAX) (SQL Server)
+- `DbFloat` - Real/Float types
+- `DbNullable<T>` - Nullable versions of any type
 
 ## Support
 
